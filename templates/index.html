@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASI Dashboard for MNCs</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Plotly.js for charting (Updated to a newer version) -->
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+
+    <!-- Papa Parse for CSV handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+    <!-- Custom Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+        }
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .plotly-chart-container {
+            width: 100%;
+            height: 100%;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        /* Style for Plotly chart loaders */
+        .chart-loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            min-height: 300px;
+            color: #6b7280;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #0ea5e9;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Main Container -->
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- Sidebar / Recommendation Panel -->
+        <aside class="w-1/4 max-w-sm bg-white p-6 overflow-y-auto shadow-lg flex flex-col">
+            <div class="flex items-center mb-8">
+                <svg class="h-8 w-8 text-sky-500 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+                </svg>
+                <h1 class="text-2xl font-bold text-gray-800">MNC Insight Engine</h1>
+            </div>
+
+            <div class="flex-grow">
+                <h2 class="text-lg font-semibold mb-4 text-gray-700">Investment Recommendation</h2>
+                <p class="text-sm text-gray-500 mb-6">Set your priorities to find the best states for your investment. The model will rank states based on your preferences.</p>
+
+                <form id="recommendation-form" class="space-y-6">
+                    <div>
+                        <label for="capital" class="block text-sm font-medium text-gray-600">Capital Investment Focus</label>
+                        <input type="range" id="capital" name="capital" min="0" max="100" value="50" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Low</span>
+                            <span>High</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="productivity" class="block text-sm font-medium text-gray-600">Productivity Demand</label>
+                        <input type="range" id="productivity" name="productivity" min="0" max="100" value="50" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                         <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Less Important</span>
+                            <span>Very Important</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="profit" class="block text-sm font-medium text-gray-600">Profitability Priority</label>
+                        <input type="range" id="profit" name="profit" min="0" max="100" value="50" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                         <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Less Important</span>
+                            <span>Very Important</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="infra" class="block text-sm font-medium text-gray-600">Infrastructure Quality</label>
+                        <input type="range" id="infra" name="infra" min="0" max="100" value="50" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                         <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Basic</span>
+                            <span>World-Class</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105">
+                        Generate Recommendations
+                    </button>
+                </form>
+
+                <div id="recommendation-results" class="mt-8">
+                     <!-- Results will be injected here -->
+                </div>
+            </div>
+            <div class="text-xs text-center text-gray-400 mt-4">
+                <p>&copy; 2025 Strategic Investments Inc.</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-6 overflow-y-auto">
+            <header class="mb-6 flex justify-between items-center">
+                 <h1 class="text-3xl font-bold text-gray-800">ASI Data Dashboard CL03</h1>
+                 <div class="text-sm text-gray-500" id="data-status">
+                     Loading dataset...
+                 </div>
+            </header>
+
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="card p-5">
+                    <h3 class="text-sm font-medium text-gray-500">Total Factories (Operational)</h3>
+                    <p class="text-3xl font-bold text-gray-800" id="total-factories">--</p>
+                </div>
+                <div class="card p-5">
+                    <h3 class="text-sm font-medium text-gray-500">Top State (by GVA)</h3>
+                    <p class="text-3xl font-bold text-sky-500" id="top-state-gva">--</p>
+                </div>
+                <div class="card p-5">
+                    <h3 class="text-sm font-medium text-gray-500">Highest Profitability</h3>
+                    <p class="text-3xl font-bold text-gray-800" id="top-state-profit">--</p>
+                </div>
+                <div class="card p-5">
+                    <h3 class="text-sm font-medium text-gray-500">Best Infrastructure Index</h3>
+                    <p class="text-3xl font-bold text-gray-800" id="top-state-infra">--</p>
+                </div>
+            </div>
+
+            <!-- Main Charts Row (Map + Bar Chart) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="card lg:col-span-2 p-4">
+                    <h2 class="text-lg font-semibold mb-2 text-gray-700 px-2">Investment Hotspots: Gross Value Added (GVA) by State</h2>
+                    <div id="india-map-chart" class="plotly-chart-container min-h-[450px]">
+                        <div class="chart-loader"><div class="spinner"></div></div>
+                    </div>
+                </div>
+                <div class="card p-4">
+                    <h2 class="text-lg font-semibold mb-2 text-gray-700 px-2">Top 10 States by GVA</h2>
+                    <div id="top-states-output-chart" class="plotly-chart-container min-h-[450px]">
+                        <div class="chart-loader"><div class="spinner"></div></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Secondary Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <div class="card p-4">
+                    <h2 class="text-lg font-semibold mb-2 text-gray-700 px-2">Capital vs. Profitability</h2>
+                     <div id="capital-profit-scatter" class="plotly-chart-container min-h-[350px]">
+                        <div class="chart-loader"><div class="spinner"></div></div>
+                    </div>
+                </div>
+                <div class="card p-4">
+                    <h2 class="text-lg font-semibold mb-2 text-gray-700 px-2">Top 10 States by Number of Factories</h2>
+                     <div id="top-states-factories-chart" class="plotly-chart-container min-h-[350px]">
+                        <div class="chart-loader"><div class="spinner"></div></div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let dataset = [];
+
+            // Fetch dataset from Flask API
+            fetch('/api/data')
+            .then(response => response.json())
+            .then(data => {
+                dataset = data.map(row => {
+                    const newRow = { State: row.State };
+                    for (const key in row) {
+                        if (key !== 'State') {
+                            newRow[key] = parseFloat(row[key]);
+                        }
+                    }
+                    return newRow;
+                });
+
+                document.getElementById('data-status').textContent = `Dataset loaded successfully (${dataset.length} records).`;
+                initializeApp();
+            })
+            .catch(err => {
+                document.getElementById('data-status').textContent = 'Error loading dataset.';
+                console.error("Fetch Error:", err);
+            });
+
+            // GeoJSON for India States
+            const indiaGeoJSON = { /* Your existing GeoJSON remains unchanged */ };
+
+            // --- INITIALIZATION ---
+            function initializeApp() {
+                if (dataset.length === 0) return;
+
+                updateKpiCards();
+                createIndiaMapChart();
+                createTopStatesOutputChart();
+                createCapitalProfitScatter();
+                createTopStatesFactoriesChart();
+                setupRecommendationEngine();
+            }
+
+            // --- KPI CARDS ---
+            function updateKpiCards() {
+                const totalFactories = dataset.reduce((sum, state) => sum + state.Factories_Operational, 0);
+                document.getElementById('total-factories').textContent = (totalFactories * 1000).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+                const topStateGVA = [...dataset].sort((a, b) => b.GVA - a.GVA)[0];
+                document.getElementById('top-state-gva').textContent = topStateGVA.State;
+
+                const topStateProfit = [...dataset].sort((a, b) => b.Profitability - a.Profitability)[0];
+                document.getElementById('top-state-profit').textContent = topStateProfit.State;
+
+                const topStateInfra = [...dataset].sort((a, b) => b.Infra_Index - a.Infra_Index)[0];
+                document.getElementById('top-state-infra').textContent = topStateInfra.State;
+            }
+
+            // --- CHART CREATION ---
+            const plotlyLayoutOptions = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: 'Inter, sans-serif', color: '#6b7280' },
+                margin: { l: 60, r: 20, b: 50, t: 20, pad: 4 },
+                xaxis: { gridcolor: '#e5e7eb' },
+                yaxis: { gridcolor: '#e5e7eb' },
+            };
+
+            const plotlyConfigOptions = {
+                responsive: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['toImage', 'sendDataToCloud', 'select2d', 'lasso2d']
+            };
+
+            function createIndiaMapChart() {
+                const chartDiv = document.getElementById('india-map-chart');
+                chartDiv.innerHTML = '';
+
+                const mapData = [{
+                    type: 'choropleth',
+                    locationmode: 'geojson-id',
+                    geojson: indiaGeoJSON,
+                    locations: dataset.map(d => d.State),
+                    featureidkey: 'properties.name',
+                    z: dataset.map(d => d.GVA),
+                    colorscale: 'Blues',
+                    reversescale: false,
+                    colorbar: { title: 'GVA Index', titleside: 'right', tickfont: { size: 10 } },
+                    hoverinfo: 'location+z',
+                    hoverlabel: { bgcolor: 'white', font: { color: 'black' } }
+                }];
+
+                const layout = {
+                    geo: { scope: 'asia', center: { lon: 82, lat: 23 }, projection: { scale: 6 }, showland: true, landcolor: '#f9fafb', subunitcolor: '#e5e7eb', bgcolor: 'rgba(0,0,0,0)' },
+                    margin: { t: 0, b: 0, l: 0, r: 0 },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                };
+
+                Plotly.newPlot(chartDiv, mapData, layout, plotlyConfigOptions);
+            }
+
+            function createTopStatesOutputChart() {
+                const chartDiv = document.getElementById('top-states-output-chart');
+                chartDiv.innerHTML = '';
+
+                const sortedData = [...dataset].sort((a, b) => b.Output - a.Output).slice(0, 10);
+
+                const trace = {
+                    x: sortedData.map(d => d.Output),
+                    y: sortedData.map(d => d.State),
+                    type: 'bar',
+                    orientation: 'h',
+                    marker: { color: '#38bdf8' }
+                };
+
+                const layout = { ...plotlyLayoutOptions, yaxis: { autorange: 'reversed' } };
+                Plotly.newPlot(chartDiv, [trace], layout, plotlyConfigOptions);
+            }
+
+            function createCapitalProfitScatter() {
+                const chartDiv = document.getElementById('capital-profit-scatter');
+                chartDiv.innerHTML = '';
+
+                const trace = {
+                    x: dataset.map(d => d.Fixed_Capital),
+                    y: dataset.map(d => d.Profitability),
+                    mode: 'markers',
+                    type: 'scatter',
+                    text: dataset.map(d => d.State),
+                    marker: { size: 10, color: '#0ea5e9', opacity: 0.7 }
+                };
+
+                const layout = {
+                    ...plotlyLayoutOptions,
+                    xaxis: { ...plotlyLayoutOptions.xaxis, title: 'Fixed Capital Index' },
+                    yaxis: { ...plotlyLayoutOptions.yaxis, title: 'Profitability Index' },
+                };
+                Plotly.newPlot(chartDiv, [trace], layout, plotlyConfigOptions);
+            }
+
+            function createTopStatesFactoriesChart() {
+                const chartDiv = document.getElementById('top-states-factories-chart');
+                chartDiv.innerHTML = '';
+
+                const sortedData = [...dataset].sort((a, b) => b.Factories - a.Factories).slice(0, 10).reverse();
+
+                const trace = {
+                    x: sortedData.map(d => d.State),
+                    y: sortedData.map(d => d.Factories),
+                    type: 'bar',
+                    marker: { color: sortedData.map(d => d.Factories), colorscale: 'Blues' }
+                };
+
+                const layout = { ...plotlyLayoutOptions, xaxis: { tickangle: -45 } };
+                Plotly.newPlot(chartDiv, [trace], layout, plotlyConfigOptions);
+            }
+
+            // --- RECOMMENDATION ENGINE ---
+            function setupRecommendationEngine() {
+                const form = document.getElementById('recommendation-form');
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    const weights = {
+                        capital: parseInt(document.getElementById('capital').value) / 100,
+                        productivity: parseInt(document.getElementById('productivity').value) / 100,
+                        profit: parseInt(document.getElementById('profit').value) / 100,
+                        infra: parseInt(document.getElementById('infra').value) / 100,
+                    };
+
+                    const scoredStates = dataset.map(state => {
+                        const score = (state.Fixed_Capital * weights.capital) +
+                                    (state.Productivity * weights.productivity) +
+                                    (state.Profitability * weights.profit) +
+                                    (state.Infra_Index * weights.infra);
+                        return { state: state.State, score: score };
+                    });
+
+                    const topStates = scoredStates.sort((a, b) => b.score - a.score).slice(0, 5);
+                    displayRecommendations(topStates);
+                });
+            }
+
+            function displayRecommendations(topStates) {
+                const resultsContainer = document.getElementById('recommendation-results');
+                resultsContainer.innerHTML = '';
+
+                const title = document.createElement('h3');
+                title.className = 'text-md font-semibold text-gray-700 mb-3';
+                title.textContent = 'Top 5 Recommended States';
+                resultsContainer.appendChild(title);
+
+                const list = document.createElement('ul');
+                list.className = 'space-y-3';
+
+                const medalColors = ['bg-yellow-400', 'bg-gray-400', 'bg-yellow-600'];
+
+                topStates.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center p-3 bg-gray-50 rounded-lg';
+
+                    let rankIndicator;
+                    if(index < 3) {
+                        rankIndicator = `<div class="w-6 h-6 rounded-full ${medalColors[index]} text-white flex items-center justify-center font-bold text-sm mr-3">${index + 1}</div>`;
+                    } else {
+                        rankIndicator = `<div class="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm mr-3">${index + 1}</div>`;
+                    }
+
+                    const stateName = `<span class="font-medium text-gray-800">${item.state}</span>`;
+                    const scoreBar = `
+                        <div class="flex-grow mx-4">
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div class="bg-sky-500 h-2.5 rounded-full" style="width: ${((item.score / topStates[0].score) * 100).toFixed(2)}%"></div>
+                            </div>
+                        </div>
+                    `;
+                    const scoreText = `<span class="text-sm font-semibold text-sky-600">${item.score.toFixed(2)}</span>`;
+
+                    li.innerHTML = rankIndicator + stateName + scoreBar + scoreText;
+                    list.appendChild(li);
+                });
+
+                resultsContainer.appendChild(list);
+            }
+        });
+        </script>
+</body>
+</html>
+
